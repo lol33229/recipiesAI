@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel, Field
 
 from app.services.collaborative_filtering import CollaborativeFiltering, get_default_cf
+from app.services.recipe_store import get_recipe, list_recipes
 
 router = APIRouter(prefix="/api/recommendations", tags=["recommendations"])
 
@@ -69,3 +70,31 @@ async def similar_recipes(req: SimilarRecipeRequest) -> RecommendResponse:
         raise HTTPException(status_code=404, detail="recipe_id не найден в матрице оценок")
     items = cf.similar_recipes(req.recipe_id, top_k=req.top_k)
     return RecommendResponse(items=[ScoredRecipe(recipe_id=x.recipe_id, score=x.score) for x in items])
+
+
+@router.post("/similar-by-ingredients", response_model=RecommendResponse)
+async def similar_by_ingredients(req: SimilarRecipeRequest) -> RecommendResponse:
+    base = get_recipe(req.recipe_id)
+    if base is None:
+        raise HTTPException(status_code=404, detail="recipe_id не найден среди опубликованных рецептов")
+
+    base_set = {x.name.strip().lower() for x in base.ingredients}
+    if not base_set:
+        return RecommendResponse(items=[])
+
+    scored: list[ScoredRecipe] = []
+    for recipe in list_recipes():
+        if recipe.recipe_id == base.recipe_id:
+            continue
+        other_set = {x.name.strip().lower() for x in recipe.ingredients}
+        if not other_set:
+            continue
+        union = base_set | other_set
+        if not union:
+            continue
+        score = len(base_set & other_set) / len(union)
+        if score > 0:
+            scored.append(ScoredRecipe(recipe_id=recipe.recipe_id, score=round(score, 4)))
+
+    scored.sort(key=lambda x: x.score, reverse=True)
+    return RecommendResponse(items=scored[: req.top_k])
