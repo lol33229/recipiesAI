@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel, Field
 
 from app.services.collaborative_filtering import CollaborativeFiltering, get_default_cf
+from app.services.personalized_recs import add_interactions, personalized_recommendations
 from app.services.recipe_store import get_recipe, list_recipes
 
 router = APIRouter(prefix="/api/recommendations", tags=["recommendations"])
@@ -38,6 +39,13 @@ class RecommendResponse(BaseModel):
     items: list[ScoredRecipe]
 
 
+class PersonalizedRecommendRequest(BaseModel):
+    user_id: str
+    top_k: int = Field(default=5, ge=1, le=50)
+    prefer_ingredients: list[str] = Field(default_factory=list)
+    exclude_ingredients: list[str] = Field(default_factory=list)
+
+
 _cf_override: CollaborativeFiltering | None = None
 
 
@@ -51,6 +59,13 @@ async def build_engine(req: BuildCFRequest) -> Response:
     global _cf_override
     tuples = [(i.user_id, i.recipe_id, i.rating) for i in req.interactions]
     _cf_override = CollaborativeFiltering(req.user_ids, req.recipe_ids, tuples)
+    return Response(status_code=204)
+
+
+@router.post("/interactions", status_code=204)
+async def add_user_interactions(req: BuildCFRequest) -> Response:
+    tuples = [(i.user_id, i.recipe_id, i.rating) for i in req.interactions]
+    add_interactions(tuples)
     return Response(status_code=204)
 
 
@@ -98,3 +113,14 @@ async def similar_by_ingredients(req: SimilarRecipeRequest) -> RecommendResponse
 
     scored.sort(key=lambda x: x.score, reverse=True)
     return RecommendResponse(items=scored[: req.top_k])
+
+
+@router.post("/personalized", response_model=RecommendResponse)
+async def personalized(req: PersonalizedRecommendRequest) -> RecommendResponse:
+    items = personalized_recommendations(
+        user_id=req.user_id,
+        top_k=req.top_k,
+        prefer_ingredients=req.prefer_ingredients,
+        exclude_ingredients=req.exclude_ingredients,
+    )
+    return RecommendResponse(items=[ScoredRecipe(recipe_id=rid, score=score) for rid, score in items])
