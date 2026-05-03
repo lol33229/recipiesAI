@@ -10,6 +10,11 @@ class Settings(BaseSettings):
     ollama_model: str = "mistral"
     # если true — без Ollama, заглушки для разработки
     mock_llm: bool = False
+    vision_model_path: str = "D:/recipiesAI/food-detection.onnx"
+    vision_labels_path: str | None = "D:/recipiesAI/labels.txt"
+    vision_input_size: int = 640
+    vision_conf_threshold: float = 0.25
+    vision_iou_threshold: float = 0.45
 
 
 @lru_cache
