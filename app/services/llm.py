@@ -19,7 +19,7 @@ async def ollama_chat(messages: list[dict], system: str | None = None) -> str:
         "messages": payload_messages,
         "stream": False,
     }
-    async with httpx.AsyncClient(timeout=120.0) as client:
+    async with httpx.AsyncClient(timeout=120.0, trust_env=False) as client:
         r = await client.post(url, json=body)
         r.raise_for_status()
         data = r.json()
