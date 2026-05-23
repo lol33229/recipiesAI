@@ -1,39 +1,37 @@
-from datetime import datetime, timezone
+import httpx
 
-from pydantic import BaseModel, Field
-
-
-class StoredIngredient(BaseModel):
-    name: str = Field(..., min_length=1)
-    grams: float = Field(..., gt=0)
+from app.clients.main_api import fetch_all_recipes, fetch_recipe
+from app.config import get_settings
+from app.models.recipe import StoredRecipe
+from app.services.main_api_mapper import map_main_api_recipe
 
 
-class StoredRecipe(BaseModel):
-    recipe_id: str = Field(..., min_length=1)
-    title: str = Field(..., min_length=1)
-    ingredients: list[StoredIngredient] = Field(default_factory=list)
-    steps: list[str] = Field(default_factory=list)
-    tags: list[str] = Field(default_factory=list)
-    nutrition_per_100g: dict[str, float]
-    unknown_ingredients: list[dict] = Field(default_factory=list)
-    created_at: str
+def recipe_source() -> str:
+    return "main_api"
 
 
-_RECIPES: dict[str, StoredRecipe] = {}
+def _ensure_main_api() -> None:
+    if not get_settings().main_api_base_url.strip():
+        raise RuntimeError("Задайте MAIN_API_BASE_URL в .env (основной Recipes.API)")
 
 
-def upsert_recipe(recipe: StoredRecipe) -> StoredRecipe:
-    _RECIPES[recipe.recipe_id] = recipe
-    return recipe
+async def get_recipe(recipe_id: str) -> StoredRecipe | None:
+    _ensure_main_api()
+    try:
+        data = await fetch_recipe(recipe_id)
+    except httpx.HTTPStatusError:
+        raise
+    except httpx.RequestError as e:
+        raise RuntimeError(f"Не удалось связаться с основным API: {e}") from e
+    if data is None:
+        return None
+    return map_main_api_recipe(data)
 
 
-def get_recipe(recipe_id: str) -> StoredRecipe | None:
-    return _RECIPES.get(recipe_id)
-
-
-def list_recipes() -> list[StoredRecipe]:
-    return list(_RECIPES.values())
-
-
-def now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+async def list_recipes() -> list[StoredRecipe]:
+    _ensure_main_api()
+    try:
+        items = await fetch_all_recipes()
+    except httpx.RequestError as e:
+        raise RuntimeError(f"Не удалось связаться с основным API: {e}") from e
+    return [map_main_api_recipe(item) for item in items]

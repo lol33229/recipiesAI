@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from app.config import get_settings
-from app.services.llm import ollama_chat
+from app.services.llm import llm_chat
 
 router = APIRouter(prefix="/api/recipes", tags=["description"])
 
@@ -37,14 +37,16 @@ async def generate_description(req: DescriptionRequest) -> DescriptionResponse:
     user_content = "\n".join(parts)
     messages = [{"role": "user", "content": user_content}]
     try:
-        text = await ollama_chat(messages, system=DESCRIPTION_SYSTEM)
+        text = await llm_chat(messages, system=DESCRIPTION_SYSTEM)
+    except ValueError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
     except httpx.HTTPStatusError as e:
-        raise HTTPException(status_code=502, detail=f"Ollama HTTP error: {e.response.status_code}") from e
+        raise HTTPException(status_code=502, detail=f"LLM HTTP error: {e.response.status_code}") from e
     except httpx.RequestError as e:
         if not settings.mock_llm:
             raise HTTPException(
                 status_code=503,
-                detail="Не удалось подключиться к Ollama. Запустите Ollama или установите MOCK_LLM=true.",
+                detail="Не удалось подключиться к LLM. Проверьте LLM_PROVIDER и ключи API в .env.",
             ) from e
         raise
     return DescriptionResponse(description=text)

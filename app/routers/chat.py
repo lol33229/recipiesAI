@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from app.config import get_settings
-from app.services.llm import ollama_chat
+from app.services.llm import llm_chat
 from app.services.recipe_store import get_recipe
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
@@ -31,7 +31,12 @@ async def chat(req: ChatRequest) -> ChatResponse:
     settings = get_settings()
     messages = [m.model_dump() for m in req.messages]
     if req.recipe_id:
-        recipe = get_recipe(req.recipe_id)
+        try:
+            recipe = await get_recipe(req.recipe_id)
+        except httpx.HTTPStatusError as e:
+            raise HTTPException(status_code=502, detail=f"Основной API: HTTP {e.response.status_code}") from e
+        except RuntimeError as e:
+            raise HTTPException(status_code=503, detail=str(e)) from e
         if recipe:
             recipe_context = (
                 f"Контекст рецепта:\n"
@@ -43,14 +48,16 @@ async def chat(req: ChatRequest) -> ChatResponse:
             )
             messages.insert(0, {"role": "user", "content": recipe_context})
     try:
-        reply = await ollama_chat(messages, system=CHAT_SYSTEM)
+        reply = await llm_chat(messages, system=CHAT_SYSTEM)
+    except ValueError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
     except httpx.HTTPStatusError as e:
-        raise HTTPException(status_code=502, detail=f"Ollama HTTP error: {e.response.status_code}") from e
+        raise HTTPException(status_code=502, detail=f"LLM HTTP error: {e.response.status_code}") from e
     except httpx.RequestError as e:
         if not settings.mock_llm:
             raise HTTPException(
                 status_code=503,
-                detail="Не удалось подключиться к Ollama. Запустите Ollama или установите MOCK_LLM=true.",
+                detail="Не удалось подключиться к LLM. Проверьте LLM_PROVIDER и ключи API в .env.",
             ) from e
         raise
     return ChatResponse(reply=reply)

@@ -55,7 +55,7 @@ def _active_cf() -> CollaborativeFiltering:
 
 @router.post("/build", status_code=204)
 async def build_engine(req: BuildCFRequest) -> Response:
-    """Подменить движок рекомендаций данными из запроса (для тестов/демо)."""
+    """Подменить движок рекомендаций данными из запроса (для тестов)."""
     global _cf_override
     tuples = [(i.user_id, i.recipe_id, i.rating) for i in req.interactions]
     _cf_override = CollaborativeFiltering(req.user_ids, req.recipe_ids, tuples)
@@ -89,7 +89,7 @@ async def similar_recipes(req: SimilarRecipeRequest) -> RecommendResponse:
 
 @router.post("/similar-by-ingredients", response_model=RecommendResponse)
 async def similar_by_ingredients(req: SimilarRecipeRequest) -> RecommendResponse:
-    base = get_recipe(req.recipe_id)
+    base = await get_recipe(req.recipe_id)
     if base is None:
         raise HTTPException(status_code=404, detail="recipe_id не найден среди опубликованных рецептов")
 
@@ -98,7 +98,7 @@ async def similar_by_ingredients(req: SimilarRecipeRequest) -> RecommendResponse
         return RecommendResponse(items=[])
 
     scored: list[ScoredRecipe] = []
-    for recipe in list_recipes():
+    for recipe in await list_recipes():
         if recipe.recipe_id == base.recipe_id:
             continue
         other_set = {x.name.strip().lower() for x in recipe.ingredients}
@@ -117,7 +117,7 @@ async def similar_by_ingredients(req: SimilarRecipeRequest) -> RecommendResponse
 
 @router.post("/personalized", response_model=RecommendResponse)
 async def personalized(req: PersonalizedRecommendRequest) -> RecommendResponse:
-    items = personalized_recommendations(
+    items = await personalized_recommendations(
         user_id=req.user_id,
         top_k=req.top_k,
         prefer_ingredients=req.prefer_ingredients,

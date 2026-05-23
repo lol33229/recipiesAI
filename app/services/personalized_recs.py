@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from app.services.collaborative_filtering import CollaborativeFiltering
+from app.models.recipe import StoredRecipe
 from app.services.recipe_store import list_recipes
 
 
@@ -35,8 +36,7 @@ def _build_cf() -> CollaborativeFiltering | None:
     return CollaborativeFiltering(user_ids=user_ids, recipe_ids=recipe_ids, interactions=tuples)
 
 
-def _user_profile_ingredients(user_id: str) -> set[str]:
-    recipes_by_id = {r.recipe_id: r for r in list_recipes()}
+def _user_profile_ingredients(user_id: str, recipes_by_id: dict[str, StoredRecipe]) -> set[str]:
     liked = [x for x in _INTERACTIONS if x.user_id == user_id and x.rating >= 4.0]
     profile: set[str] = set()
     for inter in liked:
@@ -47,13 +47,13 @@ def _user_profile_ingredients(user_id: str) -> set[str]:
     return profile
 
 
-def personalized_recommendations(
+async def personalized_recommendations(
     user_id: str,
     top_k: int = 5,
     prefer_ingredients: list[str] | None = None,
     exclude_ingredients: list[str] | None = None,
 ) -> list[tuple[str, float]]:
-    recipes = list_recipes()
+    recipes = await list_recipes()
     if not recipes:
         return []
 
@@ -61,7 +61,6 @@ def personalized_recommendations(
     exclude = {x.strip().lower() for x in (exclude_ingredients or []) if x.strip()}
     recipes_by_id = {r.recipe_id: r for r in recipes}
 
-    # карта популярности: средняя оценка рецепта
     rating_buckets: dict[str, list[float]] = {}
     for inter in _INTERACTIONS:
         rating_buckets.setdefault(inter.recipe_id, []).append(inter.rating)
@@ -70,7 +69,7 @@ def personalized_recommendations(
     }
 
     rated_by_user = {x.recipe_id for x in _INTERACTIONS if x.user_id == user_id}
-    profile = _user_profile_ingredients(user_id)
+    profile = _user_profile_ingredients(user_id, recipes_by_id)
 
     cf = _build_cf()
     cf_scores: dict[str, float] = {}

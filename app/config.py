@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -6,10 +7,27 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
+    # LLM
+    llm_provider: Literal["ollama", "mistral", "openrouter"] = "mistral"
+    mock_llm: bool = False
+
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "mistral"
-    # если true — без Ollama, заглушки для разработки
-    mock_llm: bool = False
+
+    mistral_api_key: str | None = None
+    mistral_model: str = "mistral-small-latest"
+    mistral_base_url: str = "https://api.mistral.ai/v1"
+
+    openrouter_api_key: str | None = None
+    openrouter_model: str = "mistralai/mistral-small-3.1-24b-instruct"
+    openrouter_base_url: str = "https://openrouter.ai/api/v1"
+
+    llm_timeout_sec: float = 60.0
+
+    main_api_base_url: str = "http://158.160.6.41"
+    main_api_bearer_token: str | None = None
+    main_api_timeout_sec: float = 30.0
+
     vision_model_path: str = "D:/recipiesAI/food-detection.onnx"
     vision_labels_path: str | None = "D:/recipiesAI/labels.txt"
     vision_input_size: int = 640

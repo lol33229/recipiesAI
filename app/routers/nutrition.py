@@ -24,5 +24,4 @@ class NutritionResponse(BaseModel):
 async def nutrition_per_100g(req: NutritionRequest) -> NutritionResponse:
     items = [(i.name, i.grams) for i in req.ingredients]
     per_100g, unknown = compute_nutrition_per_100g(items)
-    # убираем total_weight_g из "кбжу" в отдельное поле можно — оставим в словаре для простоты
     return NutritionResponse(per_100g=per_100g, unknown_ingredients=unknown)
