@@ -15,3 +15,6 @@ class StoredRecipe(BaseModel):
     nutrition_per_100g: dict[str, float]
     unknown_ingredients: list[dict] = Field(default_factory=list)
     created_at: str
+    average_rating: float = Field(default=0.0, ge=0.0, le=5.0)
+    ratings_count: int = Field(default=0, ge=0)
+    likes_count: int = Field(default=0, ge=0)

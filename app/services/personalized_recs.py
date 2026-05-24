@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
-from app.services.collaborative_filtering import CollaborativeFiltering
 from app.models.recipe import StoredRecipe
+from app.services.collaborative_filtering import CollaborativeFiltering
 from app.services.recipe_store import list_recipes
 
 
@@ -47,6 +47,23 @@ def _user_profile_ingredients(user_id: str, recipes_by_id: dict[str, StoredRecip
     return profile
 
 
+def _popularity_score(recipe: StoredRecipe) -> float:
+    """Популярность из основного API (рейтинг + лайки)."""
+    rating_part = recipe.average_rating / 5.0 if recipe.average_rating > 0 else 0.0
+    likes_part = min(recipe.likes_count / 10.0, 1.0) if recipe.likes_count > 0 else 0.0
+    return round(0.7 * rating_part + 0.3 * likes_part, 4)
+
+
+def _cold_start_feed(recipes: list[StoredRecipe], top_k: int) -> list[tuple[str, float]]:
+    """Лента «Для вас», если нет оценок пользователя в AI-сервисе."""
+    ranked = sorted(
+        recipes,
+        key=lambda r: (_popularity_score(r), r.ratings_count, r.likes_count, r.created_at),
+        reverse=True,
+    )
+    return [(r.recipe_id, _popularity_score(r) or 0.1) for r in ranked[:top_k]]
+
+
 async def personalized_recommendations(
     user_id: str,
     top_k: int = 5,
@@ -70,6 +87,7 @@ async def personalized_recommendations(
 
     rated_by_user = {x.recipe_id for x in _INTERACTIONS if x.user_id == user_id}
     profile = _user_profile_ingredients(user_id, recipes_by_id)
+    has_user_signals = bool(rated_by_user or profile)
 
     cf = _build_cf()
     cf_scores: dict[str, float] = {}
@@ -95,9 +113,19 @@ async def personalized_recommendations(
 
         cf_part = cf_scores.get(rid, 0.0)
         popularity_part = popularity.get(rid, 0.0)
-        score = (0.6 * cf_part) + (0.3 * profile_affinity) + (0.1 * popularity_part) + (0.1 * prefer_boost)
+        api_popularity = _popularity_score(recipe)
+
+        if has_user_signals:
+            score = (0.6 * cf_part) + (0.3 * profile_affinity) + (0.1 * popularity_part) + (0.1 * prefer_boost)
+        else:
+            # Холодный старт: опираемся на рейтинг/лайки из основного API
+            score = api_popularity + (0.15 * prefer_boost)
+
         if score > 0:
             scored.append((rid, round(score, 4)))
 
     scored.sort(key=lambda x: x[1], reverse=True)
-    return scored[:top_k]
+    if scored:
+        return scored[:top_k]
+
+    return _cold_start_feed(recipes, top_k)

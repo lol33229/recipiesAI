@@ -4,6 +4,8 @@ from app.config import get_settings
 from app.routers import chat, description, nutrition, recommendations, recipes, vision
 from app.services.recipe_store import recipe_source
 
+from fastapi.middleware.cors import CORSMiddleware
+
 app = FastAPI(
     title="KulinarAI API",
     version="0.3.0",
@@ -23,6 +25,14 @@ app = FastAPI(
         {"url": "http://127.0.0.1:8000", "description": "Локальная разработка"},
         {"url": "http://158.160.6.41:8000", "description": "Прод (укажите порт AI-сервиса за балансировщиком)"},
     ],
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  
+    allow_credentials=True,
+    allow_methods=["*"],  
+    allow_headers=["*"],  
 )
 
 app.include_router(chat.router)

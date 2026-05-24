@@ -36,8 +36,8 @@ class Settings(BaseSettings):
     main_api_bearer_token: str | None = None
     main_api_timeout_sec: float = 30.0
 
-    vision_model_path: str = "D:/recipiesAI/food-detection.onnx"
-    vision_labels_path: str | None = "D:/recipiesAI/labels.txt"
+    vision_model_path: str = "food-detection.onnx"
+    vision_labels_path: str | None = "labels.txt"
     vision_input_size: int = 640
     vision_conf_threshold: float = 0.25
     vision_iou_threshold: float = 0.45

@@ -55,4 +55,7 @@ def map_main_api_recipe(data: dict[str, Any]) -> StoredRecipe:
         nutrition_per_100g=nutrition_per_100g,
         unknown_ingredients=[],
         created_at=created_at,
+        average_rating=float(data.get("averageRating") or data.get("AverageRating") or 0),
+        ratings_count=int(data.get("ratingsCount") or data.get("RatingsCount") or 0),
+        likes_count=int(data.get("likesCount") or data.get("LikesCount") or 0),
     )
