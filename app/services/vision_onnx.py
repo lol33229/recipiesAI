@@ -5,6 +5,7 @@ import onnxruntime as ort
 from PIL import Image
 
 from app.config import get_settings
+from app.services.vision_label_i18n import label_to_russian
 
 
 _SESSION: ort.InferenceSession | None = None
@@ -37,7 +38,7 @@ def _load_labels() -> list[str]:
     return _LABELS_CACHE
 
 
-def _label_by_id(class_id: int, labels: list[str]) -> str:
+def _label_en_by_id(class_id: int, labels: list[str]) -> str:
     if 0 <= class_id < len(labels):
         return labels[class_id]
     return f"class_{class_id}"
@@ -153,10 +154,12 @@ def _parse_detection_output(
         conf = obj * cls_prob
         if conf < threshold:
             continue
+        en_label = _label_en_by_id(cls_id, labels)
         items.append(
             {
                 "class_id": cls_id,
-                "label": _label_by_id(cls_id, labels),
+                "label": label_to_russian(en_label),
+                "label_en": en_label,
                 "confidence": round(conf, 4),
                 "bbox_xywh": [x, y, w, h],
             }
@@ -173,10 +176,12 @@ def _parse_classification_output(raw: np.ndarray, labels: list[str], top_k: int)
     out = []
     for i in idx:
         class_id = int(i)
+        en_label = _label_en_by_id(class_id, labels)
         out.append(
             {
                 "class_id": class_id,
-                "label": _label_by_id(class_id, labels),
+                "label": label_to_russian(en_label),
+                "label_en": en_label,
                 "confidence": round(float(flat[i]), 4),
             }
         )

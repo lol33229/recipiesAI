@@ -9,6 +9,7 @@ router = APIRouter(prefix="/api/vision", tags=["vision"])
 class VisionItem(BaseModel):
     class_id: int
     label: str
+    label_en: str | None = None
     confidence: float
     bbox_xywh: list[float] | None = None
 

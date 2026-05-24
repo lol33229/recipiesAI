@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.responses import RedirectResponse, Response
 
 from app.config import get_settings
 from app.routers import chat, description, nutrition, recommendations, recipes, vision
@@ -41,6 +42,16 @@ app.include_router(description.router)
 app.include_router(recommendations.router)
 app.include_router(recipes.router)
 app.include_router(vision.router)
+
+
+@app.get("/", include_in_schema=False)
+async def root():
+    return RedirectResponse(url="/docs")
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    return Response(status_code=204)
 
 
 @app.get("/health")
